@@ -1,2 +1,2 @@
-# hsot
-Operational Transformation in Haskell
+# optra
+**Op**erational **Tra**nsformation in Haskell
