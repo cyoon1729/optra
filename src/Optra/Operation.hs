@@ -2,6 +2,12 @@ module Optra.Operation
     (
       Operation (..)
     , OperationSeq
+    , emptyOpSeq
+    , addRetain
+    , addDelete
+    , addInsert
+    , apply
+    , inverse
     ) where
 
 import qualified Data.Sequence as DS 
@@ -57,7 +63,7 @@ data OperationSeq = OperationSeq
     baseLen :: Int
   , targetLen :: Int
   , operations :: DS.Seq Operation
-  }
+  } deriving (Eq, Show)
 
 
 -- | Return an empty OperationSeq instance.
