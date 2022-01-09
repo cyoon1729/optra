@@ -60,6 +60,11 @@ data OperationSeq = OperationSeq
   }
 
 
+-- | Return an empty OperationSeq instance.
+emptyOpSeq :: OperationSeq
+emptyOpSeq = OperationSeq 0 0 DS.Empty 
+
+
 -- | Add a Retain operation to the OperationSeq. 
 addRetain :: OperationSeq -> Int -> OperationSeq
 addRetain (OperationSeq blen tlen ops) n
