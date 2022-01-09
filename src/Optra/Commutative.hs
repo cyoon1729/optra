@@ -1,3 +1,8 @@
+{-
+ - Implementation of Commutative operations (compose & transform) for
+ - Operational transform.
+-}
+
 module Optra.Commutative
     (
       compose
@@ -5,11 +10,13 @@ module Optra.Commutative
     ) where
 
 import qualified Data.List as DL
-import Optra.Operation (Operation, OperationSeq)
+import qualified Data.Sequence as DS
+import qualified Optra.Operation as OP 
+    
 
 
 -- | Merges operations o1 and o2 while preserving changes of both
--- | Satisfies apply(apply(S, o1), o2) - apply(S, compose(o1, o2))
+--   Satisfies apply(apply(S, o1), o2) - apply(S, compose(o1, o2))
 compose :: [Operation] -> [Operation] -> [Operation] -> Maybe [Operation]
 compose [] [] res = DL.reverse res
 
