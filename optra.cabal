@@ -23,17 +23,23 @@ common shared-properties
       base == 4.*,
       containers,
       random-strings,
+      aeson,
+      text,
+      bytestring
     ghc-options:
       -Wall
 
 
 library
-  exposed-modules:     Optra.RandomGen, Optra.Operation, Optra.Commutative
+  exposed-modules:     Optra.RandomGen, Optra.Operation, Optra.Commutative, Optra.Serialize
   -- other-modules:
   -- other-extensions:
   build-depends:       
     base >=4.12 && <4.13,
     containers >=0.6 && <0.7,
-    random-strings
+    random-strings,
+    aeson,
+    text,
+    bytestring
   hs-source-dirs:      src
   default-language:    Haskell2010
