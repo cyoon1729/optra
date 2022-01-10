@@ -3,10 +3,16 @@
 
 module Optra.Serialize
   (
-    serializeOp,
-    serializeOps,
-    deserializeOp,
-    deserializeOps
+    OpInfo (..)
+  , OpSeqInfo (..)
+  , fromOpInfo
+  , toOpInfo
+  , fromOpSeqInfo
+  , toOpSeqInfo
+  , serializeOp
+  , serializeOps
+  , deserializeOp
+  , deserializeOps
   ) where
 
 import GHC.Generics (Generic)
@@ -58,9 +64,9 @@ toOpInfo OP.NoOp       = OpInfo (DT.pack "noop") 0 (DT.pack "")
 
 data OpSeqInfo = OpSeqInfo
     {
-      baseLen   :: Int
-    , targetLen :: Int
-    , ops       :: [DT.Text]
+      blen      :: Int         -- base length
+    , tlen      :: Int         -- target length
+    , ops       :: [DT.Text]   -- encoded ops
     }  deriving (Generic, Show)
 
 
