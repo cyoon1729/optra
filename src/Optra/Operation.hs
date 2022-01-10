@@ -60,8 +60,8 @@ isNoOp _    = False
 
 data OperationSeq = OperationSeq
   {
-    baseLen :: Int
-  , targetLen :: Int
+    baseLen    :: Int
+  , targetLen  :: Int
   , operations :: DS.Seq Operation
   } deriving (Eq, Show)
 
