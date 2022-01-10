@@ -28,7 +28,7 @@ common shared-properties
 
 
 library
-  exposed-modules:     Optra.RandomGen, Optra.Operation
+  exposed-modules:     Optra.RandomGen, Optra.Operation, Optra.Commutative
   -- other-modules:
   -- other-extensions:
   build-depends:       
