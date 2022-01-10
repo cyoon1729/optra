@@ -10,4 +10,4 @@ This project is currently work-in-progress, and have many rooms for improvement.
 
 
 ### Acknowledgements
-This code follows and was tested against the Rust implementation of Operational Transformation in (spebern/operational-transform-rs)[https://github.com/spebern/operational-transform-rs], which is ported from the Javascript implementation (Operational-Transform/ot.js)[https://github.com/Operational-Transformation/ot.js/]. 
+This code follows and was tested against the Rust implementation of Operational Transformation in [spebern/operational-transform-rs](https://github.com/spebern/operational-transform-rs), which is ported from the Javascript implementation (Operational-Transform/ot.js)[https://github.com/Operational-Transformation/ot.js/]. 
