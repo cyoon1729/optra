@@ -45,6 +45,54 @@ instance ToJSON OpInfo where
     toEncoding = genericToEncoding defaultOptions
 
 
+data OpSeqInfo = OpSeqInfo
+    {
+      blen      :: Int
+    , tlen      :: Int
+    , ops       :: [DT.Text]
+    }  deriving (Generic, Show)
+
+
+instance FromJSON OpSeqInfo where
+    parseJSON = withObject "OpSeqInfo" $ \v ->
+      OpSeqInfo
+        <$> v .: "blen"
+        <*> v .: "tlen"
+        <*> v .: "ops"
+
+
+instance ToJSON OpSeqInfo where
+    toEncoding = genericToEncoding defaultOptions
+
+
+-- | Serialize OP.Operation to JSON
+serializeOp :: OP.Operation -> DB.ByteString
+serializeOp op = encode $ toOpInfo op
+
+
+-- | Serialize OP.OperationSeq to JSON
+serializeOps :: OP.OperationSeq -> DB.ByteString
+serializeOps ops = encode $ toOpSeqInfo ops 
+
+
+-- | Deserialize to OP.Operation from JSON
+deserializeOp :: DB.ByteString -> OP.Operation
+deserializeOp op = do
+    let decoded = decode op :: Maybe OpInfo
+    case decoded of
+        Just o  -> fromOpInfo o
+        Nothing -> OP.ErrorOp
+
+
+-- | Deserialize to OP.OperationSeq from JSON
+deserializeOps :: DB.ByteString -> OP.OperationSeq
+deserializeOps ops = do
+    let decoded = decode ops :: Maybe OpSeqInfo
+    case decoded of
+        Just o  -> fromOpSeqInfo o
+        Nothing -> OP.ErrorOpSeq
+
+
 -- | Convert OpInfo to OP.Operation
 fromOpInfo :: OpInfo -> OP.Operation
 fromOpInfo (OpInfo opType paramInt paramStr)
@@ -62,63 +110,17 @@ toOpInfo (OP.Insert s) = OpInfo (DT.pack "insert") 0 (DT.pack s)
 toOpInfo OP.NoOp       = OpInfo (DT.pack "noop") 0 (DT.pack "")
 
 
-data OpSeqInfo = OpSeqInfo
-    {
-      blen      :: Int         -- base length
-    , tlen      :: Int         -- target length
-    , ops       :: [DT.Text]   -- encoded ops
-    }  deriving (Generic, Show)
-
-
-instance FromJSON OpSeqInfo where
-    parseJSON = withObject "OpSeqInfo" $ \v ->
-      OpSeqInfo
-        <$> v .: "baseLen"
-        <*> v .: "targetLen"
-        <*> v .: "ops"
-
-
-instance ToJSON OpSeqInfo where
-    toEncoding = genericToEncoding defaultOptions
-
-
 -- | Convert OpSeqInfo to OP.OperationSeq
-fromOpSeqInfo :: OpSeqInfo -> Maybe OP.OperationSeq
-fromOpSeqInfo (OpSeqInfo blen tlen ops) = do
-    decodedOps <- mapM decode (map DTE.encodeUtf8 ops) :: Maybe [OpInfo]
-    let ops' = DS.fromList $ map fromOpInfo decodedOps
-    return $ OP.OperationSeq blen tlen ops' 
+fromOpSeqInfo :: OpSeqInfo -> OP.OperationSeq
+fromOpSeqInfo (OpSeqInfo blen tlen opsInfo) = OP.OperationSeq blen tlen ops
+  where
+    ops = DS.fromList $ map (deserializeOp . DTE.encodeUtf8) opsInfo
 
 
 -- | Convert OP.OperationSeq to OpSeqInfo
-toOpSeqInfo :: OP.OperationSeq -> Maybe OpSeqInfo
-toOpSeqInfo (OP.OperationSeq blen tlen ops) = do
-    let opInfos    = map toOpInfo $ DF.toList ops
-        encodedOps = map (DTE.decodeUtf8 . encode) opInfos
-    return $ OpSeqInfo blen tlen encodedOps
+toOpSeqInfo :: OP.OperationSeq -> OpSeqInfo
+toOpSeqInfo (OP.OperationSeq blen tlen ops) = OpSeqInfo blen tlen encOps
+  where
+    encOps = map (DTE.decodeUtf8 . serializeOp) (DF.toList ops)
 
-
--- | Serialize OP.Operation to JSON
-serializeOp :: OP.Operation -> DB.ByteString
-serializeOp op = encode $ toOpInfo op
-
-
--- | Serialize OP.OperationSeq to JSON
-serializeOps :: OP.OperationSeq -> DB.ByteString
-serializeOps ops = encode $ toOpSeqInfo ops 
-
-
--- | Deserialize to OP.Operation from JSON
-deserializeOp :: DB.ByteString -> Maybe OP.Operation
-deserializeOp op = do
-    decoded <- decode op :: Maybe OpInfo
-    return $ fromOpInfo decoded
-
-
--- | Deserialize to OP.OperationSeq from JSON
-deserializeOps :: DB.ByteString -> Maybe OP.OperationSeq
-deserializeOps ops = do
-    decoded <- decode ops :: Maybe OpSeqInfo
-    opSeq <- fromOpSeqInfo decoded
-    return opSeq
 
