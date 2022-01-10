@@ -9,99 +9,141 @@ module Optra.Commutative
     , transform
     ) where
 
+import qualified Data.Foldable as DF
 import qualified Data.List as DL
 import qualified Data.Sequence as DS
-import qualified Optra.Operation as OP 
+import Optra.Operation as OP 
     
 
 
--- | Merges operations o1 and o2 while preserving changes of both
---   Satisfies apply(apply(S, o1), o2) - apply(S, compose(o1, o2))
-compose :: [Operation] -> [Operation] -> [Operation] -> Maybe [Operation]
-compose [] [] res = DL.reverse res
+-- | Merges operations o1 and o2 while preserving changes of both.
+--   Satisfies apply(apply(S, o1), o2) - apply(S, compose(o1, o2)).
+compose :: OP.OperationSeq -> OP.OperationSeq -> OP.OperationSeq
+compose (OP.OperationSeq b1 t1 ops1) (OP.OperationSeq b2 t2 ops2)
+    | t1 /= b2  = OP.emptyOpSeq
+    | otherwise = composeOps (DF.toList ops1) (DF.toList ops2) OP.emptyOpSeq
 
-compose (o:ops1) [] _ = Nothing 
 
-compose [] (o:ops2) _ = Nothing
+-- | Helper function for `compose`.
+composeOps 
+    :: [OP.Operation] 
+    -> [OP.Operation] 
+    -> OP.OperationSeq 
+    -> OP.OperationSeq
+composeOps [] [] opSeq = opSeq
 
-compose ((Delete n):ops1) ops2 res = compose ops1 ops2 ((Delete n):res)  
+composeOps (o:ops1) [] _ = OP.emptyOpSeq
 
-compose ops1 ((Insert s):ops2) res = compose ops1 ops2 ((Insert s):res)
+composeOps [] (o:ops2) _ = OP.emptyOpSeq
 
-compose ((Retain n):ops1) ((Retain m):ops2) res 
-    | n < m     = compose ops1 ((Retain (m - n)):ops2) ((Retain n):res)
-    | n > m     = compose ((Retain (n - m):ops1) ops2 ((Retain m):res)
-    | otherwise = compose ops1 ops2 ((Retain n):res)
-
-compose ((Insert s):ops1) ((Delete n):ops2) res
-    | sLen < n  = compose ops1 ((Delete (n - sLen)):ops2) res
-    | sLen > n  = compose (Insert (drop s n):ops1) ops2 res 
-    | otherwise = compose ops1 ops2 res
+composeOps ((OP.Delete n):ops1) ops2 res = composeOps ops1 ops2 res'
   where
-    | sLen = length s
+    res' = OP.addDelete res n
 
-compose ((Insert s):ops1) ((Retain n):ops2) res
-    | sLen < n  = compose ops1 ((Retain (n - sLen)):ops2) ((Insert s):res)
-    | sLen > n  = compose ops1 ((Retain (sLen - n)):ops2) ((Insert s):res)
-    | otherwise = compose ops1 ops2 ((Insert s):res)
+composeOps ops1 ((OP.Insert s):ops2) res = composeOps ops1 ops2 res'
   where
-    | sLen = length s
+    res' = OP.addInsert res s
 
-compose ((Retain n):ops1) ((Delete m):ops2) res 
-    | n < m     = compose ops1 ((Delete (m - n)):ops2) ((Delete n):res)
-    | n > m     = compose ((Retain (n - m):ops1) ops2 ((Delete m):res)
-    | otherwise = compose ops1 ops2 ((Delete n):res)
+composeOps ((OP.Retain n):ops1) ((OP.Retain m):ops2) res 
+    | n < m     = composeOps ops1 ((OP.Retain (m - n)):ops2) resRetn
+    | n > m     = composeOps ((OP.Retain (n - m)):ops1) ops2 resRetm
+    | otherwise = composeOps ops1 ops2 resRetn
+  where
+    resRetn = OP.addRetain res n 
+    resRetm = OP.addRetain res m
+
+composeOps ((OP.Insert s):ops1) ((OP.Delete n):ops2) res
+    | sLen < n  = composeOps ops1 ((OP.Delete (n - sLen)):ops2) res
+    | sLen > n  = composeOps ((OP.Insert (drop n s)):ops1) ops2 res 
+    | otherwise = composeOps ops1 ops2 res
+  where
+    sLen = length s
+
+composeOps ((OP.Insert s):ops1) ((OP.Retain n):ops2) res
+    | sLen < n  = composeOps ops1 ((OP.Retain (n - sLen)):ops2) resIns
+    | sLen > n  = composeOps ops1 ((OP.Retain (sLen - n)):ops2) resIns
+    | otherwise = composeOps ops1 ops2 resIns
+  where
+    sLen   = length s
+    resIns = OP.addInsert res s
+
+composeOps ((OP.Retain n):ops1) ((OP.Delete m):ops2) res 
+    | n < m     = composeOps ops1 ((OP.Delete (m - n)):ops2) resDeln
+    | n > m     = composeOps ((OP.Retain (n - m)):ops1) ops2 resDelm
+    | otherwise = composeOps ops1 ops2 resDeln
+  where
+    resDeln = OP.addDelete res n
+    resDelm = OP.addDelete res m
 
 
 -- | Transforms two operations o1 and o2 that happened concurrently and 
 --   produces two operations o1' and o2' such that
---       apply(apply(S, o1), o2') = apply(apply(S, o2), o1')
-transform :: [Operation] -> [Operation] -> Maybe ([Operation], [Operation])
-transform [] [] res = (DL.reverse ops1', DL.reverse ops2')
+--       apply(apply(S, o1), o2') = apply(apply(S, o2), o1').
+transform
+    :: OP.OperationSeq
+    -> OP.OperationSeq
+    -> (OP.OperationSeq, OP.OperationSeq)
+transform (OP.OperationSeq b1 _ ops1) (OP.OperationSeq b2 _ ops2)
+    | b1 /= b2  = (OP.emptyOpSeq, OP.emptyOpSeq)
+    | otherwise = transformOps (DF.toList ops1) (DF.toList ops2) res
   where
-    (ops1, ops2') = res
+    res = (OP.emptyOpSeq, OP.emptyOpSeq)
 
-transform (o:ops1) [] _ = Nothing
 
-transform [] (o:ops2) _ = Nothing
+-- | Helper function for `transform`.
+transformOps 
+    :: [OP.Operation]
+    -> [OP.Operation]
+    -> (OP.OperationSeq, OP.OperationSeq)
+    -> (OP.OperationSeq, OP.OperationSeq)
 
-transform ((Insert s):ops1) ops2 res = transform ops1 ops2 res'
+transformOps [] [] res = res
+
+transformOps (o:ops1) [] _ = (OP.emptyOpSeq, OP.emptyOpSeq)
+
+transformOps [] (o:ops2) _ = (OP.emptyOpSeq, OP.emptyOpSeq)
+
+transformOps ((OP.Insert s):ops1) ops2 res = transformOps ops1 ops2 res'
   where
     (ops1', ops2') = res
-    res'           = (((Insert s):ops1'), ((Retain (length s)):ops2'))
+    res'           = ((OP.addInsert ops1' s), (OP.addRetain ops2' (length s))) 
 
-transform ops1 ((Insert s):ops2) res = transform ops1 ops2 res'
+transformOps ops1 ((OP.Insert s):ops2) res = transformOps ops1 ops2 res'
   where
     (ops1', ops2') = res
-    res'           = (((Retain (length s)):ops2'), ((Insert s):ops1'))
+    res'           = ((OP.addRetain ops1' (length s)), (OP.addInsert ops2' s)) 
 
-transform ((Retain n):ops1) ((Retain m):ops2) res
-    | n < m     = transform ops1 (retMN:ops2) ((retN:ops1'), (retN:ops2'))
-    | n > m     = transform (retNM:ops1) ops2 ((retM:ops1'), (retM:ops2'))
-    | otherwise = transform ops1 ops2 ((retN:ops1'), (retN:ops2'))
+transformOps ((OP.Retain n):ops1) ((OP.Retain m):ops2) res
+    | n < m     = transformOps ops1 (retMN:ops2) (ops1n, ops2n)
+    | n > m     = transformOps (retNM:ops1) ops2 (ops1m, ops2m)
+    | otherwise = transformOps ops1 ops2 (ops1n, ops2n)
   where
     (ops1', ops2') = res
     (retN, retM)   = ((Retain n), (Retain m))
     (retNM, retMN) = ((Retain (n-m)), (Retain (m-n)))
+    (ops1n, ops1m) = ((OP.addRetain ops1' n), (OP.addRetain ops1' m))
+    (ops2n, ops2m) = ((OP.addRetain ops2' n), (OP.addRetain ops2' m))
 
-transform ((Delete n):ops1) ((Delete m):ops2) res
-    | n < m     = transform ops1 ((Retain (m - n)):ops2) res
-    | n > m     = transform ((Retain (n - m)):ops1) ops2 res
-    | otherwise = transform ops1 ops2 res 
+transformOps ((OP.Delete n):ops1) ((OP.Delete m):ops2) res
+    | n < m     = transformOps ops1 ((OP.Retain (m - n)):ops2) res
+    | n > m     = transformOps ((OP.Retain (n - m)):ops1) ops2 res
+    | otherwise = transformOps ops1 ops2 res 
 
-transform ((Delete n):ops1) ((Retain m):ops2) res
-    | n < m     = transform ops1 ((Retain (m - n):ops2) ((delN:ops1'), ops2') 
-    | n > m     = transform ((Retain (n - m):ops1) ops2 ((delM:ops1'), ops2')
-    | otherwise = transform ops1 ops2 ((delN:ops1'), ops2')
+transformOps ((OP.Delete n):ops1) ((OP.Retain m):ops2) res
+    | n < m     = transformOps ops1 ((OP.Retain (m - n)):ops2) (ops1n, ops2') 
+    | n > m     = transformOps ((OP.Retain (n - m)):ops1) ops2 (ops1m, ops2')
+    | otherwise = transformOps ops1 ops2 (ops1n, ops2')
   where
     (ops1', ops2') = res
-    (delN, delM)   = (Delete n, Delete m)
+    (delN, delM)   = (OP.Delete n, OP.Delete m)
+    (ops1n, ops1m) = ((OP.addDelete ops1' n), (OP.addDelete ops1' m))
 
-transform ((Retain n):ops1) ((Delete m):ops2) res
-    | n < m     = transform ops1 ((Retain (m - n):ops2) (ops1', (delN:ops2')) 
-    | n > m     = transform ((Retain (n - m):ops1) ops2 (ops1', (delM:ops2'))
-    | otherwise = transform ops1 ops2 (ops1', (delN:ops2'))
+transformOps ((OP.Retain n):ops1) ((OP.Delete m):ops2) res
+    | n < m     = transformOps ops1 ((OP.Retain (m - n)):ops2) (ops1', ops2n) 
+    | n > m     = transformOps ((OP.Retain (n - m)):ops1) ops2 (ops1', ops2m)
+    | otherwise = transformOps ops1 ops2 (ops1', ops2n)
   where
     (ops1', ops2') = res
-    (delN, delM)   = (Delete n, Delete m)
+    (delN, delM)   = (OP.Delete n, OP.Delete m)
+    (ops2n, ops2m) = ((OP.addDelete ops2' n), (OP.addDelete ops2' m))
 

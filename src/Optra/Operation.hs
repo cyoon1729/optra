@@ -1,7 +1,7 @@
 module Optra.Operation 
     (
       Operation (..)
-    , OperationSeq
+    , OperationSeq (..)
     , emptyOpSeq
     , addRetain
     , addDelete
