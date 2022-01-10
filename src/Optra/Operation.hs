@@ -19,7 +19,8 @@ data Operation =
     Retain Int |
     Delete Int | 
     Insert String |
-    NoOp
+    NoOp |
+    ErrorOp
     deriving (Eq, Show)
 
 
@@ -58,12 +59,23 @@ isNoOp NoOp = True
 isNoOp _    = False
 
 
-data OperationSeq = OperationSeq
+isErrorOp :: Operation -> Bool
+isErrorOp ErrorOp = True
+isErrorOp _       = False
+
+
+data OperationSeq = ErrorOpSeq | OperationSeq
   {
     baseLen    :: Int
   , targetLen  :: Int
   , operations :: DS.Seq Operation
   } deriving (Eq, Show)
+
+
+-- | Check ErrorOpSeq
+isErrorOpSeq :: OperationSeq -> Bool
+isErrorOpSeq ErrorOpSeq = True
+isErrorOpSeq _          = False
 
 
 -- | Return an empty OperationSeq instance.
@@ -118,16 +130,16 @@ addInsert (OperationSeq blen tlen ops) s
 
 
 -- | Apply operations to a String and output resulting string.
-apply :: OperationSeq -> String -> Maybe String
+--   If OperationSeq is not applicable to string, just return original.
+apply :: OperationSeq -> String -> String
 apply (OperationSeq blen tlen opSeq) str
-    | length str == blen = Just $ applyOps (DF.toList opSeq) str ""
-    | otherwise          = Nothing
+    | length str == blen = applyOps (DF.toList opSeq) str ""
+    | otherwise          = str
  
 
 -- | Helper function for apply.
 applyOps :: [Operation] -> String -> String -> String
 applyOps [] str res = res
-
 applyOps ((Retain n):ops) str res = applyOps ops str' res'
   where
     str' = drop n str 
@@ -137,10 +149,16 @@ applyOps ((Delete n):ops) str res = applyOps ops (drop n str) res
      
 applyOps ((Insert s):ops) str res = applyOps ops str (res ++ s)
 
+applyOps ((NoOp):ops) str res     = applyOps ops str res
+
+applyOps ((ErrorOp):ops) str res  = str 
+
 
 -- | Compute inverse of a sequence of operations.
 inverse :: OperationSeq -> String -> OperationSeq
-inverse (OperationSeq blen tlen opSeq) str = OperationSeq blen tlen inv
+inverse (OperationSeq blen tlen opSeq) str
+    | elem ErrorOp inv = ErrorOpSeq
+    | otherwise           = OperationSeq blen tlen inv
   where
     inv = DS.fromList $ inverseOps (DF.toList opSeq) str []
 
@@ -162,6 +180,12 @@ inverseOps ((Delete n):ops) str inv = inverseOps ops str' inv'
 inverseOps ((Insert s):ops) str inv = inverseOps ops str inv'
   where
     inv' = ((Delete (length s)):inv)
+
+
+inverseOps ((NoOp):ops) str inv = inverseOps ops str inv
+
+inverseOps ((ErrorOp):ops) str inv = [ErrorOp]
+
 
 
 -- | Safely get last n elements from a Seq; if not enough elements, add NoOp.
